@@ -1,0 +1,484 @@
+---
+title: "Project"
+output:
+  word_document: default
+  html_document: default
+---
+```{r}
+library(ggplot2)
+library(ggplotify)
+library(GGally)
+library(dplyr)
+```
+Data:
+V1:Sex
+V2:Length
+V3:Diameter
+V4:Height
+V5:Whole weight
+V6:Shucked weight
+V7:Viscera weight
+V8:Shell weight
+V9: Rings
+
+## LOAD THE DATA
+
+```{r}
+abalone = read.csv("abalone.txt", header=FALSE)
+sapply(abalone,class)
+```
+
+Clearly V1 is a categorical variable, the others are quantitative
+
+## PIE CHART FOR QUALITATIVE
+```{r}
+n <- length(abalone$V1)
+data <- data.frame(
+  Sex=c('M','F','I'),
+  value=c(round(100*table(abalone$V1)/n))
+)
+data <- data %>% mutate( ypos=c(cumsum(data$value)- 0.5*data$value))
+data <- data %>% mutate(labels=paste(as.character(data$value),c('%')))
+
+bp<- ggplot(data, aes(x="", y=value, fill=Sex))+geom_bar(width = 1, stat = "identity")
+pie <- bp + coord_polar("y", start=0) +  geom_text(aes(y = ypos, label = labels), color = "BLACK", size=6) + ggtitle('          Pie chart with percentage for Sex') + theme(axis.title.x=element_blank(),axis.title.y=element_blank(),axis.ticks=element_blank())
+pie
+```
+
+
+## HISTOGRAMS FOR QUANTITATIVE VARIABLES
+
+```{r}
+par(mfrow = c(3, 3))
+xlabs <- c("Length","Diameter","Height","Whole Weight","Shucked weight","Viscera weight","Shell weight")
+for(i in 2:8) {
+hist(abalone[, i], main=paste("Histogram of", names(abalone)[i]),xlab=xlabs[i-1])}
+```
+V2: Left skewed
+V3: left skewed
+V4: Heavily right skewed (If not for outliers normal)
+V5: Right skewed
+V6: Right skewed
+V7: Right skewed
+V8: Right skewed
+
+## BOX PLOTS BY CATGORICAL VARIABLE LEVELS
+
+```{r}
+boxplot(abalone$V2~factor(abalone$V1),main='Length by Sex level', xlab='Sex',ylab='Length',col=rainbow(5))
+boxplot(abalone$V3~factor(abalone$V1),main='Diameter by Sex level', xlab='Sex',ylab='Diameter',col=rainbow(5))
+boxplot(abalone$V4~factor(abalone$V1),main='Height by Sex level', xlab='Sex',ylab='Height',col=rainbow(5))
+boxplot(abalone$V5~factor(abalone$V1),main='Whole weight by Sex level', xlab='Sex',ylab='Whole weight',col=rainbow(5))
+boxplot(abalone$V6~factor(abalone$V1),main='Shucked weight by Sex level', xlab='Sex',ylab='Shucked Weight',col=rainbow(5))
+boxplot(abalone$V7~factor(abalone$V1),main='Viscera weight by Sex level', xlab='Sex',ylab='Viscera weight',col=rainbow(5))
+boxplot(abalone$V8~factor(abalone$V1),main='Shell weight by Sex level', xlab='Sex',ylab='Shell weight',col=rainbow(5))
+```
+
+V2: length of male and female is not so different. Mean is also similar around 0.6. 
+V3: diameter of male and female is not so different. Mean is also similar around 0.45.
+V4: There are significant outliers in height for M and F. 
+V5: whole weight of male and female is not so different. Mean is also similar around 1.0. 
+V6: shucked weight of male and female is not so different. Mean is also similar around 1.0. 
+V7: Viscera weight of male and female is not so different. Mean is also similar around 0.2. 
+V8: Shell weight of male and female is not so different. Mean is also similar around 0.3. 
+
+## HISTORGRAM OF RINGS
+```{r}
+hist(abalone[, 9], main="Histogram of Rings",xlab='Rings')
+```
+
+V8: Right skewed distribution
+
+## BOX PLOT OF RINGS
+```{r}
+boxplot(abalone$V9~factor(abalone$V1),main='Rings by Sex level', xlab='Sex',ylab='Rings',col=rainbow(5))
+```
+V8: Rings of male and female is not so different. Mean is also similar around 10. 
+
+```{r}
+panel.cor <- function(x, y){
+    usr <- par("usr"); on.exit(par(usr))
+    par(usr = c(0, 1, 0, 1))
+    r <- round(cor(x, y), digits=2)
+    txt <- paste0("R = ", r)
+    cex.cor <- 0.8/strwidth(txt)
+    text(0.5, 0.5, txt, cex = cex.cor * r)
+}
+# Customize upper panel
+upper.panel<-function(x, y){
+  points(x,y, pch = 19)
+}
+# Create the plots
+pairs(abalone[,2:9], 
+      lower.panel = panel.cor,
+      upper.panel = upper.panel)
+```
+
+```{r}
+
+cormat <- round(cor(abalone[2:9]),2)
+
+get_lower_tri<-function(cormat){
+    cormat[upper.tri(cormat)] <- NA
+    return(cormat)
+  }
+  # Get upper triangle of the correlation matrix
+get_upper_tri <- function(cormat){
+    cormat[lower.tri(cormat)]<- NA
+    return(cormat)
+}
+
+reorder_cormat <- function(cormat){
+# Use correlation between variables as distance
+dd <- as.dist((1-cormat)/2)
+hc <- hclust(dd)
+cormat <-cormat[hc$order, hc$order]
+}
+
+library(reshape2)
+upper_tri <- get_upper_tri(cormat)
+
+melted_cormat <- melt(upper_tri, na.rm = TRUE)
+# Reorder the correlation matrix
+cormat <- reorder_cormat(cormat)
+upper_tri <- get_upper_tri(cormat)
+# Melt the correlation matrix
+melted_cormat <- melt(upper_tri, na.rm = TRUE)
+```
+
+```{r}
+# Create a ggheatmap
+ggheatmap <- ggplot(melted_cormat, aes(Var2, Var1, fill = value))+
+ geom_tile(color = "white")+
+ scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+   midpoint = 0, limit = c(-1,1), space = "Lab", 
+    name="Pearson\nCorrelation") +
+  theme_minimal()+ # minimal theme
+ theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+    size = 12, hjust = 1))+
+ coord_fixed()
+
+
+
+ggheatmap + 
+geom_text(aes(Var2, Var1, label = value), color = "black", size = 4) +
+theme(
+  axis.title.x = element_blank(),
+  axis.title.y = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.border = element_blank(),
+  panel.background = element_blank(),
+  axis.ticks = element_blank(),
+  legend.justification = c(1, 0),
+  legend.position = c(0.6, 0.7),
+  legend.direction = "horizontal")+
+  guides(fill = guide_colorbar(barwidth = 7, barheight = 1,
+                title.position = "top", title.hjust = 0.5))
+```
+
+Strong correlation between variables. Variables themselves weakly correlated with Rings. 
+
+## MODEL BUILDING 
+
+### Split data and fit full model
+
+```{r}
+abalone$V1 = factor(abalone$V1)
+
+set.seed(5)
+n.s <- nrow(abalone)
+index <- sample(1: n.s, size=n.s*0.8, replace=FALSE)
+abalone.train <- abalone[index,] ## get the training data set.
+abalone.test <- abalone[-index,] ## the remaining cases form the validation set.
+
+
+fit1 = lm(V9~.,data =abalone.train)
+summary(fit1)
+plot(fit1,which=1)
+plot(fit1,which=2)
+MASS::boxcox(fit1)
+anova(fit1)
+```
+
+Clear evidence of nonlinearity. From QQ and residuals. Unequal variance
+QQ plot right skewed. 
+A linear fit with the full model is insufficient.
+From boxcox log transformation is required on Y (Age)
+
+
+
+```{r}
+abalone.transformed = abalone
+abalone.transformed$V9 = log(abalone.transformed$V9)
+abalone.train_transformed <- abalone.transformed[index,] ## get the training data set.
+abalone.test_transformed <- abalone.transformed[-index,] ## the remaining cases form the validation set.
+```
+
+```{r}
+rxxinverse = solve(cor(abalone.transformed[2:9]))
+diag(rxxinverse)
+```
+
+There is some evidence of strong multicollinearity among some variables. However it should not result in significant impact in the fit and model metrics. This is expected in experimental data. We will add interaction terms to the model to fix this. 
+
+## FIT TRANSFORMED Y
+
+```{r}
+fit2 = lm(V9~.,data =abalone.train_transformed)
+summary(fit2)
+plot(fit2,which=1)
+plot(fit2,which=2)
+anova(fit2)
+```
+
+A log transform is necessary as it improved the fit significantly. The QQ plot also moved closer towards a normal distribution. It is still however more skewed towards the right. 
+
+## After transformation
+```{r}
+boxplot(abalone.transformed$V9~factor(abalone.transformed$V1),main='log(Rings) by Sex level', xlab='Sex',ylab='log(Rings)',col=rainbow(5))
+```
+
+## Residuals plot vs all quantitative predictors
+```{r}
+par(mfrow = c(3, 3))
+xlabs <- c("Length","Diameter","Height","Whole Weight","Shucked weight","Viscera weight","Shell weight")
+for(i in 2:8) {
+plot(abalone.train_transformed[, i],fit2$residuals, main=paste("Residuals plot of", names(abalone)[i]),xlab=xlabs[i-1])}
+
+```
+There is no clear evidence of nonlinearity. (From the above plots and residuals vs fitted values) 
+
+```{r}
+cor(abalone.transformed[2:9])
+pairs(abalone.transformed[,2:9], 
+      lower.panel = panel.cor,
+      upper.panel = upper.panel)
+```
+
+We need to use a interaction terms. 
+
+## Stepwise Regression and Model selection
+
+```{r}
+fit0 = lm (V9 ~1,data = abalone.train_transformed)
+summary(fit0)
+anova(fit0)
+
+```
+
+
+```{r}
+fit.2waymodel = lm(V9 ~ .^2,data = abalone.train_transformed)
+summary(fit.2waymodel)
+anova(fit.2waymodel)
+plot(fit.2waymodel,which=1)
+plot(fit.2waymodel,which=2)
+```
+
+```{r}
+library(MASS)
+step.f.aic<-stepAIC(fit0,scope=list(upper=fit.2waymodel, lower=~1), trace = 0, direction="both", k=2)
+step.f.bic<-stepAIC(fit0,scope=list(upper=fit.2waymodel, lower=~1), trace = 0, direction="both", k=log(nrow(abalone.train_transformed)))
+```
+
+```{r}
+summary(step.f.aic)
+summary(step.f.bic)
+```
+
+```{r}
+fit.3waymodel = lm(V9 ~ .^3,data = abalone.train_transformed)
+summary(fit.3waymodel)
+anova(fit.3waymodel)
+plot(fit.3waymodel,which=1)
+plot(fit.3waymodel,which=2)
+```
+
+```{r}
+step.f2.aic<-stepAIC(fit0,scope=list(upper=fit.3waymodel, lower=~1), trace = 0, direction="both", k=2)
+step.f2.bic<-stepAIC(fit0,scope=list(upper=fit.3waymodel, lower=~1), trace = 0, direction="both", k=log(nrow(abalone.train_transformed)))
+```
+
+```{r}
+summary(step.f2.aic)
+summary(step.f2.bic)
+```
+
+
+## MSPE of best model of 2 way and 3 way, with validation (Outsample)
+```{r}
+y.hat1 <- predict(step.f.aic, abalone.test_transformed)
+MSPE_2way <- mean((abalone.test_transformed$V9 - y.hat1)^2)
+MSPE_2way
+
+y.hat2 <- predict(step.f.bic, abalone.test_transformed)
+MSPE_2way2 <- mean((abalone.test_transformed$V9 - y.hat2)^2)
+MSPE_2way2
+
+y.hat3 <- predict(step.f2.aic, abalone.test_transformed)
+MSPE_3way <- mean((abalone.test_transformed$V9 - y.hat3)^2)
+MSPE_3way
+
+y.hat4 <- predict(step.f2.bic, abalone.test_transformed)
+MSPE_3way2 <- mean((abalone.test_transformed$V9 - y.hat4)^2)
+MSPE_3way2
+#anova(step.f.aic)
+#sum(anova(step.f.aic)[1:18,2])/nrow(abalone.train_transformed)
+
+```
+
+## Therefore the two way interaction model predicted from stepwise regression using BIC (lesser terms than AIC model) is the best in accordance with ocaam's razor. BIC criterion returns same model for 2 way and 3 way interaction.
+
+## Plots and metrics for best model with 2 way terms on the training data
+```{r}
+
+plot(step.f.bic,which=1)
+plot(step.f.bic,which=2)
+plot(step.f.bic,which=4)
+plot(step.f.bic, which=5)
+plot(step.f.bic$fitted.values, abalone.train_transformed$V9,xlab=expression(hat(Y)), ylab='Y', main="Train data fitted values vs actual values(Model trained on training data)")
+abline(0,1, lty=2)
+
+plot(y.hat2, abalone.test_transformed$V9,xlab=expression(hat(Y)), ylab='Y', main="Test data fitted values vs actual values(Model trained on training data)")
+abline(0,1, lty=2)
+
+MSPE_train_2way3 <- mean((step.f.bic$fitted.values - abalone.train_transformed$V9)^2)
+cat('MSPE of the model fit using training data and predicted on the training data is:',MSPE_train_2way3,'\n')
+
+cat('MSPE of the model fit using training data and predicted on the validation data is:',MSPE_2way2) # MSPE on test
+```
+
+MSPE values of Train and test data for the model is similar. Therefore the model does not overfit the data.
+
+## From cook's distance plot there are outliers
+
+```{r}
+e <- step.f.bic$residuals
+h <- influence(step.f.bic)$hat
+de <- e/(1 - h) 
+plot(e, de, xlab = "residuals", ylab = "deleted residuals")
+abline(0, 1)
+summary(h)
+```
+
+Hiis are small
+
+## Bonferroni for outlier in Y
+```{r}
+stu.res.del <- studres(step.f.bic)
+head(sort(abs(stu.res.del), decreasing = TRUE))
+```
+
+```{r}
+qt(1-.1/(2*nrow(abalone.train_transformed)), nrow(abalone.train_transformed)-3-1) 
+```
+
+3 cases can be removed
+
+```{r}
+fit.outY <- lm(V9 ~ V4 + V8 + V6 + V5 + V1 + V7 + V3 + V2 + V5:V1 + 
+    V4:V3 + V6:V3 + V8:V5 + V3:V2 + V6:V2, data = abalone.train_transformed, subset = setdiff(rownames(abalone.train_transformed),c("2184","3087","237")))  ##exclude 3 cases
+rbind(step.f.bic$coefficients, fit.outY$coefficients)  ##compare fitted regression coefficients
+summary(fit.outY)
+plot(step.f.bic$fitted.value, predict(fit.outY,abalone.train_transformed), xlab = "fitted values using all cases", 
+    ylab = "fitted values without using 3 cases")  ## compare fitted values
+abline(0, 1)
+```
+
+As can be seen, there is little difference in these two fits, so even the most influential cases can be retained.
+
+## Cooks + refit for outlier in X
+
+```{r}
+fit.outX <- lm(V9 ~ V4 + V8 + V6 + V5 + V1 + V7 + V3 + V2 + V5:V1 + 
+    V4:V3 + V6:V3 + V8:V5 + V3:V2 + V6:V2, data = abalone.train_transformed, subset = setdiff(rownames(abalone.train_transformed),c("1211","3977","237")))  ##exclude 3 cases
+rbind(step.f.bic$coefficients, fit.outX$coefficients)  ##compare fitted regression coefficients
+summary(fit.outX)
+plot(step.f.bic$fitted.value, predict(fit.outX,abalone.train_transformed), xlab = "fitted values using all cases", 
+    ylab = "fitted values without using 3 cases")  ## compare fitted values
+abline(0, 1)
+```
+
+As can be seen, there is little difference in these two fits, so even the most influential cases can be retained.
+
+## Summary of validation model
+## Metrics of model fit with validation data for comparison
+
+
+```{r}
+
+best_valid_model <- lm(V9 ~ V4 + V8 + V6 + V5 + V1 + V7 + V3 + V2 + V5:V1 + 
+    V4:V3 + V6:V3 + V8:V5 + V3:V2 + V6:V2, data = abalone.test_transformed)
+
+mse_t <- sum(step.f.bic$residuals^2)/nrow(abalone.train_transformed)
+mse_v <- sum(best_valid_model$residuals^2)/nrow(abalone.test_transformed)
+Radj_t <- summary(step.f.bic)$adj.r.squared
+Radj_v <- summary(best_valid_model)$adj.r.squared
+train_sum <- c(mse_t,Radj_t)
+valid_sum <- c(mse_v,Radj_v)
+criteria <- rbind(train_sum,valid_sum)
+colnames(criteria) <- c("MSE","R2_adj")
+criteria
+summary(best_valid_model)
+
+plot(best_valid_model$fitted.values,abalone.test_transformed$V9,xlab = 'Fitted values of Rings predicted by the model fit using validation data',ylab = 'True values of Rings in validation data')
+abline(0,1,col="red")
+```
+
+## Let us now fit the model with all the data. 
+```{r}
+FINAL_MODEL <- lm(V9 ~ V4 + V8 + V6 + V5 + V1 + V7 + V3 + V2 + V5:V1 + 
+    V4:V3 + V6:V3 + V8:V5 + V3:V2 + V6:V2, data = abalone.transformed)
+anova(FINAL_MODEL)
+summary(FINAL_MODEL)
+plot(FINAL_MODEL,which=1)
+plot(FINAL_MODEL$fitted.values,abalone.transformed$V9,xlab = 'Fitted values of Rings predicted by the model fit full  dataset',ylab = 'True values of Rings in full data')
+abline(0,1,col="red")
+```
+
+## Since the data had high multicollinearity, We will also show a fit with ridge regression on the train dataset.
+
+```{r}
+lambda.s=exp(seq(log(1e-3), log(3), length.out = 1000)) ## sequence of lambda: equally spaced on log-scale
+fit.ridge=lm.ridge(V9~V2 + V3 + V4 + V5 + V6 + V7 + V8, data=abalone.train_transformed,lambda=lambda.s) #FOR SCALING
+lambda.GCV=fit.ridge$lambda[which.min(fit.ridge$GCV)]
+```
+
+
+```{r}
+no.na=abalone.train_transformed$frame[abalone.train_transformed$frame != '']
+a <- rep(0,3341) # start with 0's
+a[which(no.na=='I')] <- 1 # replace with 1's
+b <- rep(0,3341)
+b[which(no.na=='M')] <- 1
+
+no.na=abalone.test_transformed$frame[abalone.test_transformed$frame != '']
+a1 <- rep(0,836) # start with 0's
+a1[which(no.na=='I')] <- 1 # replace with 1's
+b1 <- rep(0,836)
+b1[which(no.na=='M')] <- 1
+
+fit.ridge2=lm.ridge(V9~., data=abalone.train_transformed,lambda=lambda.s)
+coef.GCV=fit.ridge2$coef[, which.min(fit.ridge2$GCV)]
+
+X.train=scale(abalone.train_transformed[,2:8], center=fit.ridge$xm, scale=fit.ridge$scales)
+X.train = cbind(cbind(a,b),X.train)
+Yh.train=X.train%*%coef.GCV+fit.ridge2$ym
+X.test=scale(abalone.test_transformed[,2:8], center=fit.ridge$xm, scale=fit.ridge$scales)
+X.test = cbind(cbind(a1,b1),X.test)
+Yh.test=X.test%*%coef.GCV+fit.ridge2$ym
+
+par(mfrow=c(1,2))
+plot( Yh.train,abalone.train_transformed$V9, xlab=expression(hat(Y)), ylab="Y", main="ridge: training set")
+abline(0,1, lty=2,col='red')
+plot( Yh.test,abalone.test_transformed$V9, xlab=expression(hat(Y)), ylab="Y", main="ridge: testing set")
+abline(0,1, lty=2,col='red')
+MSPE_train_ridge <- mean((Yh.train - abalone.train_transformed$V9)^2)
+
+MSPE_test_ridge <- mean((Yh.test - abalone.test_transformed$V9)^2)
+cat('MSPE of the model fit using training data and predicted on the training data is:',MSPE_train_ridge,'\n')
+cat('MSPE of the model fit using training data and predicted on the validation data is:',MSPE_test_ridge)
+```
+
+
+The MSPEs of the ridge values are close to the ones obtained from the interaction model fitted on the training data.Although multicollinearity is high, there is a lot of data that means both the fits for interaction model and ridge are fairly close and both methods help decrease this effect.
